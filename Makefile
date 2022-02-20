@@ -7,6 +7,6 @@ test: gcc
 			./test.sh
 
 clean:
-			 rm -f test
+			rm -f test
 
 .PHONY: test clean

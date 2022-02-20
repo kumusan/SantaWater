@@ -6,9 +6,21 @@
 #include <string.h>
 
 // 種類
-typedef enum { TK_RESERVED, TK_NUM, TK_EOF } TokenKind;
+typedef enum {
+    TK_RESERVED, // symbol
+    TK_NUM,      // int
+    TK_EOF,      // eof
+} TokenKind;
+typedef enum {
+    ND_ADD, // +
+    ND_SUB, // -
+    ND_MUL, // *
+    ND_DIV, // /
+    ND_NUM, // int
+} NodeKind;
 
 typedef struct Token Token;
+typedef struct Node Node;
 
 // 型
 struct Token {
@@ -17,10 +29,38 @@ struct Token {
     int val;
     char *str;
 };
+struct Node {
+    NodeKind kind; // node type
+    Node *lhs;     // left hand side
+    Node *rhs;     // right hand side
+    int val;       // val = ND_NUM
+};
 
 Token *token;
 
 char *user_input;
+
+Node *expr();
+Node *mul();
+Node *primary();
+bool consume(char op);
+void expect(char op);
+int expect_number();
+
+Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = kind;
+    node->lhs = lhs;
+    node->rhs = rhs;
+    return node;
+}
+
+Node *new_node_num(int val) {
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = ND_NUM;
+    node->val = val;
+    return node;
+}
 
 // error point
 void error_at(char *loc, char *fmt, ...) {
@@ -36,7 +76,45 @@ void error_at(char *loc, char *fmt, ...) {
     exit(1);
 }
 
-// op = '+'
+Node *expr() {
+    Node *node = mul();
+    for (;;) {
+        if (consume('+')) {
+            node = new_node(ND_ADD, node, mul());
+        } else if (consume('-')) {
+            node = new_node(ND_SUB, node, mul());
+        } else {
+            return node;
+        }
+    }
+}
+
+Node *mul() {
+    Node *node = primary();
+    for (;;) {
+        if (consume('*')) {
+            node = new_node(ND_MUL, node, primary());
+        } else if (consume('/')) {
+            node = new_node(ND_DIV, node, primary());
+        } else {
+            return node;
+        }
+    }
+}
+
+Node *primary() {
+    // '(' expr ')'
+    if (consume('(')) {
+        Node *node = expr();
+        expect(')');
+        return node;
+    }
+
+    // () ではないので数字
+    return new_node_num(expect_number());
+}
+
+// op = + | - | * | / | ( | )
 bool consume(char op) {
     if (token->kind != TK_RESERVED || token->str[0] != op)
         return false;
@@ -44,7 +122,6 @@ bool consume(char op) {
     return true;
 }
 
-// op = '-'
 void expect(char op) {
     if (token->kind != TK_RESERVED || token->str[0] != op)
         error_at(token->str, "'%c'ではありません", op);
